@@ -37,11 +37,4 @@ STRUCT_IFREQ:
         ifr_hwaddr dq struct_sockaddr_ifr_hwaddr
 	ifr_ifindex dd 0
 
-section .bss
 
-;struct_sockaddr_ifr_hwaddr:
-;       sa_family resb 2
-;      sa_data resb 14
-
-buffer:
-	resb 65536
