@@ -5,6 +5,18 @@ section .text
 global _start
 
 _start:
+	mov eax, 0x1	;write
+	mov edi, 0x1
+	mov esi, prompt
+	mov edx, prompt_len
+	syscall
+
+	mov eax, 0	;read
+	mov edi, 0
+	mov esi, Message
+	mov edx, len
+	syscall
+
 
 	socket AF_INET, SOCK_DGRAM, 0
 	mov [s], eax
@@ -16,18 +28,26 @@ _start:
 	mov byte [struct_sockaddr + 6], 0
 	mov byte [struct_sockaddr + 7], 1
 	sendto [s], Message, len, 0, struct_sockaddr, sockaddr_len
+	mov eax, 0x3	;close /* Make sure to close the socket file descriptor after using it to free up allocated memory */
+	mov edi, [s]
+	syscall
 	jmp exit
 
 exit:
-	mov rax, 0x3c
+	mov rax, 0x3c	;exit
 	xor rdi, rdi
 	syscall
 
 section .data
-Message:
-	db "Oi lads", 0xa
+prompt:
+	db "Enter message here:", 0
 
-len equ $-Message
+prompt_len equ $-prompt
+
+;Message:
+;	db "Oi lads", 0xa
+
+;len equ $-Message
 
 ip_address:
 	db 4, 4, 4, 4
@@ -49,7 +69,9 @@ section .bss
 s:
 	resd 1
 
-
+Message:
+	resb 32
+len equ $-Message
 
 
 
