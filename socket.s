@@ -21,6 +21,34 @@ ETH_P_IPV6 equ 0x86DD
 	syscall
 %endmacro
 
+%macro bind 3
+	mov eax, 0x31
+	mov edi, %1
+	mov rsi, %2
+	mov rdx, %3
+	syscall
+%endmacro
+
+%macro sendmsg 4
+	mov eax, 0x2e
+	mov edi, %1
+	lea esi, [%2]
+	mov edx, %3
+	mov r10d, %4
+	syscall
+%endmacro
+
+%macro sendto 6
+	mov eax, 0x2c
+	mov rdi, %1
+	mov rsi, %2
+	mov rdx, %3
+	mov r10, %4
+	mov r8, %5
+	mov r9, %6
+	syscall
+%endmacro
+
 %macro recvfrom 6
 	mov eax, 0x2d
 	mov edi, %1
