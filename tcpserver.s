@@ -60,9 +60,6 @@ section .data
 s:
 	dd 0
 
-s_accept:
-	dd 0
-
 port:
 	dw 8080
 
