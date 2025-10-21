@@ -28,6 +28,8 @@ connection:
 	mov rsi, buffer
 	mov rdx, buffer_len
 	syscall
+	cmp eax, 0x1
+	jle closedbypeer
 	mov eax, 0x1		;write
 	mov edi, 0x1
 	mov rsi, buffer
@@ -38,14 +40,24 @@ connection:
 	mov rsi, my_buffer
 	mov rdx, my_buffer_len
 	syscall
+	cmp eax, 0x1
+	jle exit
 	mov eax, 0x1		;write
 	xor rdi, rdi
 	mov rdi, [s]
 	mov rsi, my_buffer
 	mov edx, my_buffer_len
 	syscall
+	jmp connection
+
+closedbypeer:
+	mov eax, 0x1		;write
+	mov edi, 0x1
+	mov rsi, connectionclosedmessage
+	mov edx, closedmessage_len
+	syscall
 	mov eax, 0x3		;close
-	mov rdi, [s]
+	mov edi, [s]
 	syscall
 	jmp exit
 
@@ -57,7 +69,15 @@ exit:
 
 
 section .data
+connectionclosedmessage:
+	db "Connection closed by peer", 0xa
+
+closedmessage_len equ $-connectionclosedmessage
+
 s:
+	dd 0
+
+s_accept:
 	dd 0
 
 port:
