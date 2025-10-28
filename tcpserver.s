@@ -1,5 +1,7 @@
 %include "socket.s"
 
+extern recv
+
 section .text
 
 global _start
@@ -9,6 +11,7 @@ _start:
 	socket AF_INET, SOCK_STREAM, 0
 
 	mov [s], eax
+	setsockopt [s], SOL_SOCKET, SO_REUSEADDR, sock_toggle, 4
 	mov byte [struct_sockaddr_local+ 4], 127
 	mov byte [struct_sockaddr_local+ 5], 0
 	mov byte [struct_sockaddr_local+ 6], 0
@@ -69,6 +72,9 @@ exit:
 
 
 section .data
+sock_toggle:
+	dd 1
+
 connectionclosedmessage:
 	db "Connection closed by peer", 0xa
 
