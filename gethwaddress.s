@@ -14,7 +14,7 @@ Ioctl:
         ioctl [fd], SIOCGIFHWADDR, STRUCT_IFREQ
 loop:
 	mov r8b, BYTE [STRUCT_IFREQ + 16 + 2 + r9]
-	mov [address_buffer + r9], r8b
+	mov BYTE [address_buffer + r9], r8b
 	inc r9
 	cmp r9, 0x6
 	je Htoa
