@@ -203,6 +203,11 @@ IPv4:
 	syscall
 	mov eax, 0x1
 	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	mov eax, 0x1
+	mov edi, 0x1
 	mov esi, buffer
 	mov edx, 0x2
 	syscall
@@ -234,21 +239,138 @@ IPv4:
 	syscall
 	mov eax, 0x1
 	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	mov r8w, WORD [Packet_Buffer + 18]	; mov value the offset of the Identification into r8
+	zero buffer, 100			; zero out the buffer
+	mov WORD [buffer], r8w			; mov the value into the buffer
+	lea r14, [buffer + 2]			; Load Effective Address of the buffer offset by 2
+	htoa buffer, 2, r14			; Turn the Identification value into ASCII
+	mov eax, 0x1				; Write the ASCII byte value to terminal
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x4
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
 	mov esi, Dont_Fragment_Message
 	mov edx, Dnt_Frgmnt_Msg_Len
 	syscall
 	zero buffer, 100			; Zero out the buffer
-	mov r9w, WORD [Packet_Buffer + 17]	; mov the next 2 bytes form the IPv4 Header into r9, they come in Little Endian and are the Flags, and Fragment Offset fields
+	mov r9w, WORD [Packet_Buffer + 20]	; mov the next 2 bytes form the IPv4 Header into r9, they come in Little Endian and are the Flags, and Fragment Offset fields
 	mov r8w, r9w				; mov value of r9 into r8
-	shr r8w, 0x2				; Shift r8 right by 2 bits to put the Don't Fragment value in the least signifigant bit
+	shr r8w, 0x6				; Shift r8 right by 6 bits to put the Don't Fragment value in the least signifigant bit
 	and r8w, 0x1				; Clear all other bits in r8 but that bit
 	mov BYTE [buffer], r8b			; mov it into buffer
 	htoa buffer, 1, buffer
 	mov eax, 0x1
 	mov edi, 0x1
+	lea esi, [buffer + 1]
+	mov edx, 0x1
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, More_Fragments_Message
+	mov edx, Mr_Frgmnts_Msg_Len
+	syscall
+	mov r8w, r9w
+	shr r8w, 0x5				; Shift r8 right by 5 bits to put the More Fragments value in the least signifigant bit
+	and r8w, 0x1				; Clear all other bits in r8 but that bit
+	mov BYTE [buffer], r8b			; mov it into buffer
+	htoa buffer, 1, buffer
+	mov eax, 0x1				; Write the More Fragments ASCII bit to teerminal
+	mov edi, 0x1
+	lea esi, [buffer + 1]
+	mov edx, 0x1
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Fragment_Offset_Message
+	mov edx, Frgmnt_Ofst_Msg_Len
+	syscall
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	mov r8w, r9w
+	and r8w, 0x1f				; Clear all bits in r8w but the Fragment Offset bits
+	mov WORD [buffer], r8w			; mov the Fragment Offset value into buffer
+	lea r14, [buffer + 2]			; Load the Effective Address of the buffer offset by 2 bytes
+	htoa buffer, 2, r14			; Turn the Fragment Offset value into the ASCII form of the raw bytes
+	mov eax, 0x1				; Write the ASCII Fragment Offset value to terminal
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x4
+	syscall
+	newline
+	xor r8, r8
+	zero buffer, 100
+	mov r8b, BYTE [Packet_Buffer + 22]	; mov the TTL value into r8
+	mov BYTE [buffer], r8b			; mov the TTL value into buffer
+	htoa buffer, 1, buffer			; Turn the TTL value into the ASCII form of the raw byte
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, TTL_Message
+	mov edx, TTL_Msg_Len
+	syscall
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	mov eax, 0x1				; Write the ASCII TTL Value to terminal
+	mov edi, 0x1
 	mov esi, buffer
 	mov edx, 0x2
 	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Protocol_Message
+	mov edx, Prtcl_Msg_Len
+	syscall
+	xor r8, r8
+	mov r8b, BYTE [Packet_Buffer + 23]		; mov the Protocol value into r8
+	mov BYTE [Protocol], r8b			; mov the Protocol value from r8 into Protocol
+	htoa Protocol, 1, buffer			; Turn the protocol into the ASCII form of the raw byte
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	mov eax, 0x1					; Write the raw ASCII Protocol byte to terminal
+	mov edi, 0x1
+	mov esi, buffer
+	mov edx, 0x2
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Checksum_Message
+	mov edx, Chcksm_Msg_Len
+	syscall
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	zero buffer, 100
+	mov r8w, WORD [Packet_Buffer + 24]		; mov the Checksum value into r8
+	mov WORD [buffer], r8w				; mov the Checksum value into buffer
+	lea r14, [buffer + 2]				; Load Effective Address of the buffer offset by 2 bytes
+	htoa buffer, 2, r14				; Turn the Checksum value int the ASCII form of the raw bytes
+	mov eax, 0x1					; Write the ASCII Checksum value to terminal
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 4
+	syscall
+	newline
+	mov r8d, DWORD [Packet_Buffer + 26]		; mov the Source Address value into r8
 	jmp Next_Packet
 
 ARP:
@@ -262,6 +384,7 @@ ARP:
 IPv6:
 
 Next_Packet:
+	zero Packet_Buffer, 65535
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Packet_Divider
@@ -378,6 +501,29 @@ Dont_Fragment_Message:
 	db "Don't Fragment: "
 Dnt_Frgmnt_Msg_Len equ $-Dont_Fragment_Message
 
+More_Fragments_Message:
+	db "More Fragments: "
+Mr_Frgmnts_Msg_Len equ $-More_Fragments_Message
+
+Fragment_Offset_Message:
+	db "Fragment Offset: "
+Frgmnt_Ofst_Msg_Len equ $-Fragment_Offset_Message
+
+TTL_Message:
+	db "Time To Live: "
+TTL_Msg_Len equ $-TTL_Message
+
+Protocol_Message:
+	db "Protocol: "
+Prtcl_Msg_Len equ $-Protocol_Message
+
+Protocol:
+	db 0
+
+Checksum_Message:
+	db "Checksum: "
+Chcksm_Msg_Len equ $-Checksum_Message
+
 ; ARP
 ARP_Header_Message:
 	db "ARP Header:", 0xa
@@ -388,7 +534,8 @@ Header_Length:
 
 section .bss
 Packet_Buffer:
-	resb 65536
+	resb 65535
+Pckt_Bfr_Len equ $-Packet_Buffer
 
 buffer:
 	resb 100
