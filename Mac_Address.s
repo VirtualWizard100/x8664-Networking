@@ -1,5 +1,9 @@
-%macro mac_address 2
+%macro mac_address 1
 %%start:
+	[section .data]
+	%%colon:
+		db ":"
+	[section .text]
 	lea r8, BYTE [%1 + r9]
 	mov eax, 0x1
 	mov edi, 0x1
@@ -11,7 +15,7 @@
 	je %%end	; If it is equal to the ascii_address_buffer length, jump to Newline
 	mov eax, 0x1	; Write colon in between ASCII bytes
 	mov edi, 0x1
-	mov esi, %2
+	mov esi, %%colon
 	mov edx, 0x1
 	syscall
 	jmp %%start

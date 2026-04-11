@@ -2,6 +2,7 @@
 %include "ioctl.s"
 %include "hextoasciimacro.s"
 %include "Mac_Address.s"
+%include "IP_Address.s"
 %include "Newline.s"
 %include "Zero.s"
 
@@ -32,7 +33,7 @@ Htoa:
 	xor r9, r9
 
 MAC_Address_write:
-	mac_address ascii_address_buffer, colon
+	mac_address ascii_address_buffer
 	xor r9, r9
 	newline
 
@@ -61,11 +62,6 @@ Bind:
 
 Read:
 	newline
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Packet_Message
-	mov edx, Pkt_Msg_Len
-	syscall
 	mov eax, 0x0					; Read Incoming Packet into Packet_Buffer
 	mov edi, [fd]
 	mov esi, Packet_Buffer
@@ -75,9 +71,15 @@ Read:
 	rol dx, 0x8					; Swap the bytes of edx since the byte length returned from read comes in Little Endian
 	mov WORD [buffer], dx				; mov the byte length value into buffer
 	mov DWORD [Packet_Length], eax			; mov the Packet Byte Length into Packet_Length for later use
+	mov eax, 0x1
+        mov edi, 0x1
+        mov esi, Packet_Message
+        mov edx, Pkt_Msg_Len
+        syscall
 	mov eax, 0x1					; Write all packet bytes to terminal
 	mov edi, 0x1
 	mov rsi, Packet_Buffer
+	mov edx, DWORD [Packet_Length]
 	syscall
 	newline
 	newline
@@ -113,7 +115,7 @@ ProcessPacket:
 	mov esi, Src_Address
 	mov edx, srclen
 	syscall
-	mac_address ascii_address_buffer, colon
+	mac_address ascii_address_buffer
 	newline
 
 Dest_MAC_Address:
@@ -124,7 +126,7 @@ Dest_MAC_Address:
 	mov esi, Dst_Address
 	mov edx, dstlen
 	syscall
-	mac_address ascii_address_buffer, colon
+	mac_address ascii_address_buffer
 	newline
 	mov eax, 0x1				; Write Ethernet Protocol Message to terminal
         mov edi, 0x1
@@ -164,7 +166,7 @@ IPv4:
 	mov edx, IPv4_Hdr_Msg_Len
 	syscall
 	lea r8, WORD [Packet_Buffer + 14]	; Load Effective Address of the first byte of the IPv4 Header
-	htoa r8, 1, buffer			; turn it into a string
+	htoa r8, 1, buffer			; Turn it into a string
 	mov eax, 0x1				; Write Version_Buffer message to terminal
 	mov edi, 0x1
 	mov esi, Version_Buffer
@@ -206,7 +208,7 @@ IPv4:
 	mov esi, Hex_Symbol
 	mov edx, 0x2
 	syscall
-	mov eax, 0x1
+	mov eax, 0x1				; Write the ASCII form of the Differentiated Services value to terminal
 	mov edi, 0x1
 	mov esi, buffer
 	mov edx, 0x2
@@ -370,7 +372,20 @@ IPv4:
 	mov edx, 4
 	syscall
 	newline
-	mov r8d, DWORD [Packet_Buffer + 26]		; mov the Source Address value into r8
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Source_Address_Message
+	mov edx, Src_Addrss_Msg_Len
+	syscall
+	IP_Address [Packet_Buffer + 26]            	; Pass the dereferenced Source Address offset in the IPv4 Header to IP_Address
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Destination_Address_Message
+	mov edx, Dst_Addrss_Msg_Len
+	syscall
+	IP_Address [Packet_Buffer + 30]			; Pass the dereferenced Destination Address offset in the IPv4 Header to IP_Address
+	newline
 	jmp Next_Packet
 
 ARP:
@@ -420,9 +435,6 @@ buflen equ $-address_buffer
 ascii_address_buffer:
 	times buflen*2 db 0
 newlen equ $-ascii_address_buffer
-
-colon:
-	db ":"
 
 struct_sockaddr_ll:
 	dw AF_PACKET
@@ -523,6 +535,14 @@ Protocol:
 Checksum_Message:
 	db "Checksum: "
 Chcksm_Msg_Len equ $-Checksum_Message
+
+Source_Address_Message:
+	db "Source Address: "
+Src_Addrss_Msg_Len equ $-Source_Address_Message
+
+Destination_Address_Message:
+	db "Destination Address: "
+Dst_Addrss_Msg_Len equ $-Destination_Address_Message
 
 ; ARP
 ARP_Header_Message:
