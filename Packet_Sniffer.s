@@ -415,7 +415,7 @@ continue:
 	mov eax, 0x1					; Write the ASCII Options bytes to terminal
 	mov edi, 0x1
 	mov esi, buffer
-	shl r14, 0x2					; Shift the value r14 left by 1 to multiply it by 2 to account for double the amount of ASCII bytes
+	shl r14, 0x1					; Shift the value r14 left by 1 to multiply it by 2 to account for double the amount of ASCII bytes
 	mov edx, r14d
 	syscall
 	newline
