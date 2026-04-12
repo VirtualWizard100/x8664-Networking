@@ -22,7 +22,7 @@ Ioctl:
         ioctl [fd], SIOCGIFHWADDR, STRUCT_IFREQ
 
 copy_address_bytes:
-	mov r8b, BYTE [STRUCT_IFREQ + 16 + 2 + r9] 		; mov the STRUCT_IFREQ + ifrname + ifr_hwaddr.sa_family + current MAC Address byte offset byte into r8
+	movzx r8, BYTE [STRUCT_IFREQ + 16 + 2 + r9] 		; mov the STRUCT_IFREQ + ifrname + ifr_hwaddr.sa_family + current MAC Address byte offset byte into r8
 	mov BYTE [address_buffer + r9], r8b			; store the current MAC Address byte into the buffer offset by the current MAC Address byte
 	inc r9							; Increment r9
 	cmp r9, 0x6						; Compare r9 to 6 (The length in bytes of the MAC Address)
@@ -191,7 +191,6 @@ IPv4:
 	newline
 	mov r8b, BYTE [Packet_Buffer + 14]	; mov first byte of IPv4 Header into r8
 	and r8b, 0xf				; Clear the version number from r8 to only have the Internet Header Length
-	mul r8, 4				; Multiply it by 4 to get the Total Header Length in bytes (Since the Header Length is how many DWORDs (4 bytes) there are in the IPv4 Header
 	mov BYTE [Header_Length], r8b		; mov it into Header Length
 	mov r8b, BYTE [Packet_Buffer + 15]	; mov the Differentiated Services Field into r8
 	shr r8b, 0x2				; Shift right by 2 to only have the Differentiated Services Codepoint Value
@@ -386,8 +385,41 @@ IPv4:
 	syscall
 	IP_Address [Packet_Buffer + 30]			; Pass the dereferenced Destination Address offset in the IPv4 Header to IP_Address
 	newline
+	call IPv4_Options
 	jmp Next_Packet
 
+IPv4_Options:
+	movzx r14, BYTE [Header_Length]
+        sub r14, 0x5					; Subtract minimum amount of DWORDs in the IPv4 Header
+        zero Header_Length, 4
+        cmp r14, 0x1					; Compare r14 to 1
+	jae continue					; If it is above, or equal to 1, jump to continue
+	ret
+
+continue:
+	mov eax, 0x1					; Write Options Message to terminal
+	mov edi, 0x1
+	mov esi, Options_Message
+	mov edx, Optns_Msg_Len
+	syscall
+	shl r14, 0x2					; Shift the value in r14 left by to to multiply the value by 4 to get the amount of bytes in the Options field
+	mov DWORD [Header_Length], r14d                 ; Move the potential options length value into Header_Length for later use
+	lea r15, [Packet_Buffer + 34]			; Load the Effective Address of the Options field offset into r15
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	zero buffer, 100
+	htoa r15, r14, buffer				; Turn the Options bytes into the ASCII form of the raw bytes
+	mov eax, 0x1					; Write the ASCII Options bytes to terminal
+	mov edi, 0x1
+	mov esi, buffer
+	shl r14, 0x2					; Shift the value r14 left by 1 to multiply it by 2 to account for double the amount of ASCII bytes
+	mov edx, r14d
+	syscall
+	newline
+	ret
 ARP:
 	mov eax, 0x1
 	mov edi, 0x1
@@ -397,6 +429,12 @@ ARP:
 	jmp Next_Packet
 
 IPv6:
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, IPv6_Header_Message
+	mov edx, IPv6_Hdr_Msg_Len
+	syscall
+	jmp Next_Packet
 
 Next_Packet:
 	zero Packet_Buffer, 65535
@@ -544,10 +582,19 @@ Destination_Address_Message:
 	db "Destination Address: "
 Dst_Addrss_Msg_Len equ $-Destination_Address_Message
 
+Options_Message:
+	db "Options: "
+Optns_Msg_Len equ $-Options_Message
+
 ; ARP
 ARP_Header_Message:
 	db "ARP Header:", 0xa
 ARP_Hdr_Msg_Len equ $-ARP_Header_Message
+
+; IPv6
+IPv6_Header_Message:
+	db "IPv6 Header:", 0xa
+IPv6_Hdr_Msg_Len equ $-IPv6_Header_Message
 
 Header_Length:
 	dd 0
