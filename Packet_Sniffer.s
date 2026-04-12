@@ -391,7 +391,6 @@ IPv4:
 IPv4_Options:
 	movzx r14, BYTE [Header_Length]
         sub r14, 0x5					; Subtract minimum amount of DWORDs in the IPv4 Header
-        zero Header_Length, 4
         cmp r14, 0x1					; Compare r14 to 1
 	jae continue					; If it is above, or equal to 1, jump to continue
 	ret
@@ -403,6 +402,7 @@ continue:
 	mov edx, Optns_Msg_Len
 	syscall
 	shl r14, 0x2					; Shift the value in r14 left by to to multiply the value by 4 to get the amount of bytes in the Options field
+	zero Header_Length, 4
 	mov DWORD [Header_Length], r14d                 ; Move the potential options length value into Header_Length for later use
 	lea r15, [Packet_Buffer + 34]			; Load the Effective Address of the Options field offset into r15
 	mov eax, 0x1
