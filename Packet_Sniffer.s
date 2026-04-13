@@ -3,8 +3,10 @@
 %include "hextoasciimacro.s"
 %include "Mac_Address.s"
 %include "IP_Address.s"
+%include "IPv6_Address.s"
 %include "Newline.s"
 %include "Zero.s"
+%include "Htoib.s"
 
 section .text
 
@@ -104,6 +106,7 @@ Read:
 	newline
 
 ProcessPacket:
+	zero Arp, 1
 	mov eax, 0x1					; Write "Ethernet Header:\n" to terminal
 	mov edi, 0x1
 	mov esi, Ethernet_Header_Message
@@ -311,44 +314,23 @@ IPv4:
 	newline
 	xor r8, r8
 	zero buffer, 100
-	mov r8b, BYTE [Packet_Buffer + 22]	; mov the TTL value into r8
-	mov BYTE [buffer], r8b			; mov the TTL value into buffer
-	htoa buffer, 1, buffer			; Turn the TTL value into the ASCII form of the raw byte
+	lea r14, [Packet_Buffer + 22]		; Load the Effective Address of the TTL offset into r14
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, TTL_Message
 	mov edx, TTL_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
-	mov eax, 0x1				; Write the ASCII TTL Value to terminal
-	mov edi, 0x1
-	mov esi, buffer
-	mov edx, 0x2
-	syscall
+	zero buffer, 100
+	htoib r14, buffer
 	newline
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Protocol_Message
 	mov edx, Prtcl_Msg_Len
 	syscall
-	xor r8, r8
-	mov r8b, BYTE [Packet_Buffer + 23]		; mov the Protocol value into r8
-	mov BYTE [Protocol], r8b			; mov the Protocol value from r8 into Protocol
-	htoa Protocol, 1, buffer			; Turn the protocol into the ASCII form of the raw byte
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
-	mov eax, 0x1					; Write the raw ASCII Protocol byte to terminal
-	mov edi, 0x1
-	mov esi, buffer
-	mov edx, 0x2
-	syscall
+	lea r14, [Packet_Buffer + 23]			; Load the Effective Address of Protocol offset in the IPv4 Header
+	zero buffer, 100
+	htoib r14, buffer
 	newline
 	mov eax, 0x1
 	mov edi, 0x1
@@ -392,7 +374,7 @@ IPv4_Options:
 	movzx r14, BYTE [Header_Length]
         sub r14, 0x5					; Subtract minimum amount of DWORDs in the IPv4 Header
         cmp r14, 0x1					; Compare r14 to 1
-	jae continue					; If it is above, or equal to 1, jump to continue
+	jge continue					; If it is greater than, or equal to 1, jump to continue
 	ret
 
 continue:
@@ -421,12 +403,13 @@ continue:
 	newline
 	ret
 ARP:
+	mov BYTE [Arp], 0x1
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, ARP_Header_Message
 	mov edx, ARP_Hdr_Msg_Len
 	syscall
-	jmp Next_Packet
+	jmp IPv4
 
 IPv6:
 	mov eax, 0x1
@@ -434,6 +417,130 @@ IPv6:
 	mov esi, IPv6_Header_Message
 	mov edx, IPv6_Hdr_Msg_Len
 	syscall
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Version_Buffer
+	mov edx, Vrsn_Bfr_Len
+	syscall
+	movzx r14, BYTE [Packet_Buffer + 14]		; mov the Version byte in the IPv6 Header into r14
+	shr r14, 4					; Shift r14 right by 4 bits to only have the Version nibble
+	mov BYTE [buffer], r14b				; mov the Version value into buffer
+	htoa buffer, 1, buffer				; Turn the Version value into the ASCII form of the raw bytes
+	mov eax, 0x1					; Write the Version to terminal
+	mov edi, 0x1
+	lea esi, [buffer + 1]				; Load the Effective Address of the buffer offset by 1 to account for the '0' byte into esi
+	mov edx, 0x1
+	syscall
+	newline
+	zero buffer, 2
+	movzx r14, WORD	[buffer + 14]			; mov the first word of the IPv6 Header into r14 to get the whole Traffic Class field
+	and r14w, 0xff0					; Clear all bits in r14 but the Traffic Class bits
+	shr r14w, 0x4					; Shift the bits in r14w left by 4 to put the Traffic Class bits at the least signifigant bit
+	mov BYTE [buffer], r14b				; store the Traffic Class byte into buffer
+	mov eax, 0x1					; Write Traffic Class message to terminal
+	mov edi, 0x1
+	mov esi, Traffic_Class_Message
+	mov edx, Trfc_Cls_Msg_Len
+	syscall
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	htoa buffer, 1, buffer				; Turn the Traffic Class into the ASCII form of the raw byte
+	mov eax, 0x1					; Write the Traffic Class ASCII byte to terminal
+	mov edi, 0x1
+	mov esi, buffer
+	mov edx, 0x2
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Flow_Label_Message
+	mov edx, Flw_Lbl_Msg_Len
+	syscall
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	movzx r14, DWORD [Packet_Buffer + 14]		; mov the first DWORD of the IPv6 Header into r14 to get the Flow Label bits
+	and r14, 0x0fffff				; Clear all bits in r14 but the Flow Label bits
+	mov DWORD [buffer], r14d			; Store the Flow Label DWORD into buffer
+	lea r14, [buffer + 4]				; Load the Effective Address of the buffer offset by 4 to compensate for the Flow Label DWORD
+	htoa buffer, 4, r14				; Turn the Flow Label DWORD into the ASCII form of the raw bytes
+	mov eax, 0x1
+	mov edi, 0x1
+	lea esi, [buffer + 7]				; Load the Effective Address of the buffer offset by 7 to compensate for the Flow Label DWORD, and the first 3 zero nibbles of the Flow Label ASCII nibbles
+	mov edx, 5
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Payload_Length_Message
+	mov edx, Pyld_Lngth_Msg_Len
+	syscall
+	movzx r14, WORD [Packet_Buffer + 18]		; mov the Payload Length value into r14
+	mov WORD [buffer], r14w				; mov the Payload Length value into buffer
+	lea r14, [buffer + 2]				; Load the Effective Address of the buffer offset by 2 to compensate for the Payload Length WORD value
+	htoa buffer, 2, r14				; Turn the Payload Length value into the ASCII form of the raw bytes
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hex_Symbol
+	mov edx, 0x2
+	syscall
+	mov eax, 0x1					; Write the ASCII Payload Length value to terminal
+	mov edi, 0x1
+	lea esi, [buffer + 2]
+	mov edx, 0x4
+	syscall
+	newline
+	zero buffer, 6
+	lea r14, BYTE [Packet_Buffer + 20]		; Load the Effective Address of the Next Header value into r14
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Next_Header_Message
+	mov edx, Nxt_Hdr_Msg_Len
+	syscall
+	htoib r14, buffer				; Write the ASCII integer form of the raw byte to terminal
+	newline
+	lea r14, [Packet_Buffer + 21]			; Load the Effective Address of the Hop Limit value into r14
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Hop_Limit_Message
+	mov edx, Hp_Lmt_Msg_Len
+	syscall
+	zero buffer, 2
+	htoib r14, buffer				; Write the ASCII integer form of the raw byte to terminal
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Source_Address_Message
+	mov edx, Src_Addrss_Msg_Len
+	syscall
+	mov r14, QWORD [Packet_Buffer + 22]		; mov the first QWORD of the Source Address into r14
+	mov QWORD [buffer], r14				; mov the first QWORD of the Source Address into the buffer
+	mov r14, QWORD [Packet_Buffer + 30]		; mov the second QWORD of the Source Address into r14
+	mov QWORD [buffer + 8], r14			; mov the second QWORD of the Source Address into the buffer offset by 8 to compensate for the first QWORD of the Source Address
+	lea r14, [buffer + 16]				; Load the Effective Address of the buffer offset by 16 to compensate for the Source Address
+	htoa buffer, 16, r14				; Turn the Source Address into the ASCII form of the raw bytes
+	IPv6_Address r14				; Write the Source Address to terminal
+	newline
+	zero buffer, 100
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Destination_Address_Message
+	mov edx, Dst_Addrss_Msg_Len
+	syscall
+	mov r14, QWORD [Packet_Buffer + 38]		; mov the first QWORD of the Destination Address into r14
+	mov QWORD [buffer], r14				; mov the first QWORD of the Destination Address into the buffer
+	mov r14, QWORD [Packet_Buffer + 46]		; mov the second QWORD of the Destination Address into r14
+	mov QWORD [buffer + 8], r14			; mov the second QWORD of the Destination Address into the buffer offset by 8 to compensate for the first QWORD of the Destination Address
+	lea r14, [buffer + 16]				; Load the Effective Address of the buffer offset by 16 to compensate for the Destination Address
+	htoa buffer, 16, r14				; Turn the Destination Address into the ASCII form of the raw bytes
+	IPv6_Address r14				; Write the Destination Address to terminal
+	newline
+	zero buffer, 100
 	jmp Next_Packet
 
 Next_Packet:
@@ -444,6 +551,7 @@ Next_Packet:
 	mov edx, Pkt_Dvdr_Len
 	syscall
 	jmp Read
+
 exit:
         mov eax, 0x3c
         mov edi, 0
@@ -588,13 +696,36 @@ Optns_Msg_Len equ $-Options_Message
 
 ; ARP
 ARP_Header_Message:
-	db "ARP Header:", 0xa
+	db "ARP:", 0xa
 ARP_Hdr_Msg_Len equ $-ARP_Header_Message
+
+Arp:
+	db 0
 
 ; IPv6
 IPv6_Header_Message:
 	db "IPv6 Header:", 0xa
 IPv6_Hdr_Msg_Len equ $-IPv6_Header_Message
+
+Traffic_Class_Message:
+	db "Traffic Class: "
+Trfc_Cls_Msg_Len equ $-Traffic_Class_Message
+
+Flow_Label_Message:
+	db "Flow Label: "
+Flw_Lbl_Msg_Len equ $-Flow_Label_Message
+
+Payload_Length_Message:
+	db "Payload Length: "
+Pyld_Lngth_Msg_Len equ $-Payload_Length_Message
+
+Next_Header_Message:
+	db "Next Header: "
+Nxt_Hdr_Msg_Len equ $-Next_Header_Message
+
+Hop_Limit_Message:
+	db "Hop Limit: "
+Hp_Lmt_Msg_Len equ $-Hop_Limit_Message
 
 Header_Length:
 	dd 0
