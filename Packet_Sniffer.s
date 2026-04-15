@@ -7,6 +7,7 @@
 %include "Newline.s"
 %include "Zero.s"
 %include "Htoib.s"
+%include "Hex.s"
 
 section .text
 
@@ -21,7 +22,28 @@ _start:
 	xor r8, r8
 
 Ioctl:
-        ioctl [fd], SIOCGIFHWADDR, STRUCT_IFREQ
+        ioctl [fd], SIOCGIFHWADDR, STRUCT_IFREQ			; Get the MAC Address of wlan0, and store it in STRUCT_IFREQ
+	ioctl [fd], SIOCGIFFLAGS, STRUCT_IFREQ_ifr_ifflags	; Get the interface flags on wlan0
+	xor r8, r8
+	mov r8w, WORD [STRUCT_IFREQ_ifr_ifflags + 16]
+	test r8, 0x100						; Test if the IFF_PROMISC flag is set
+	jnz copy_address_bytes					; If the AND result in test reults in a non-zero value (0x100), then the IFF_PROMISC flags is set, and jump to copy_address_bytes
+	add r8, 0x100						; Else, add the IFF_PROMISC flag to the interface flags
+	mov WORD [buffer], r8w
+	lea r8, [buffer + 2]
+	htoa buffer, 2, r8
+	lea r8, [buffer + 2]
+	hex
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r8d
+	mov edx, 4
+	syscall
+	newline
+	movzx r8, WORD [buffer]
+	mov WORD [STRUCT_IFREQ_ifr_ifflags + 16], r8w		; Add the IFF_PROMISC flag value to the value in ifr_ifflags to set the interface to promiscuous mode
+	xor r8, r8
+	ioctl [fd], SIOCSIFFLAGS, STRUCT_IFREQ_ifr_ifflags	; Write the flags to the wlan0 interface to set the interface to promiscuous mode
 
 copy_address_bytes:
 	movzx r8, BYTE [STRUCT_IFREQ + 16 + 2 + r9] 		; mov the STRUCT_IFREQ + ifrname + ifr_hwaddr.sa_family + current MAC Address byte offset byte into r8
@@ -92,11 +114,7 @@ Read:
 	mov esi, Bytes_Recieved_Message
 	mov edx, Bts_Rcvd_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, r14d
@@ -136,11 +154,7 @@ Dest_MAC_Address:
         mov esi, Ethernet_Protocol_Message
         mov edx, Ethrnt_Prtcl_Msg_Len
         syscall
-	mov eax, 0x1				; Write "0x" to terminal
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 
 Ethernet_Protocol:
 	lea r14, [Packet_Buffer + 12]		; Load Effective Address of offset of Ethernet Protocol
@@ -205,11 +219,7 @@ IPv4:
 	mov esi, DS_Message
 	mov edx, DS_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	mov eax, 0x1				; Write the ASCII form of the Differentiated Services value to terminal
 	mov edi, 0x1
 	mov esi, buffer
@@ -221,11 +231,7 @@ IPv4:
 	mov esi, Total_Length_Message
 	mov edx, Ttl_Lngth_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	mov r8w, WORD [Packet_Buffer + 16]	; mov the Total Length into r8
 	mov WORD [buffer], r8w			; mov the Total Length value into buffer
 	lea r14, [buffer + 2]			; Load the Effective address of the buffer offset by 2 to compensate for the Total Length value into r14
@@ -241,11 +247,7 @@ IPv4:
 	mov esi, Identification_Message
 	mov edx, Idntfctn_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	mov r8w, WORD [Packet_Buffer + 18]	; mov value the offset of the Identification into r8
 	zero buffer, 100			; zero out the buffer
 	mov WORD [buffer], r8w			; mov the value into the buffer
@@ -296,11 +298,7 @@ IPv4:
 	mov esi, Fragment_Offset_Message
 	mov edx, Frgmnt_Ofst_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	mov r8w, r9w
 	and r8w, 0x1f				; Clear all bits in r8w but the Fragment Offset bits
 	mov WORD [buffer], r8w			; mov the Fragment Offset value into buffer
@@ -329,6 +327,9 @@ IPv4:
 	mov edx, Prtcl_Msg_Len
 	syscall
 	lea r14, [Packet_Buffer + 23]			; Load the Effective Address of Protocol offset in the IPv4 Header
+	zero Protocol, 1
+	movzx r15, BYTE [r14]
+	mov BYTE [Protocol], r15b
 	zero buffer, 100
 	htoib r14, buffer
 	newline
@@ -337,11 +338,7 @@ IPv4:
 	mov esi, Checksum_Message
 	mov edx, Chcksm_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	zero buffer, 100
 	mov r8w, WORD [Packet_Buffer + 24]		; mov the Checksum value into r8
 	mov WORD [buffer], r8w				; mov the Checksum value into buffer
@@ -367,7 +364,18 @@ IPv4:
 	syscall
 	IP_Address [Packet_Buffer + 30]			; Pass the dereferenced Destination Address offset in the IPv4 Header to IP_Address
 	newline
+	lea r15, [Packet_Buffer + 14]			; Load the Effective Address of the potential offset of the Layer 4 Header
+	movzx r8, BYTE [Packet_Buffer + 14]
+	and r8, 0xf					; Clear the Version bits to only have the Internet Header Length bits
+	shl r8, 0x2					; Shift r8 left by 2 to times it by 4 to get the amount of bytes in the Internet Header
+	add r15, r8					; Add the amount of bytes in the Internet Header including Options to r15, Should be the exact offset of the TCP/UDP Header including options
 	call IPv4_Options
+	newline
+	movzx r8, BYTE [Protocol]
+	cmp r8, 0x6
+	je TCP
+	cmp r8, 0x11
+	je UDP
 	jmp Next_Packet
 
 IPv4_Options:
@@ -384,14 +392,11 @@ continue:
 	mov edx, Optns_Msg_Len
 	syscall
 	shl r14, 0x2					; Shift the value in r14 left by to to multiply the value by 4 to get the amount of bytes in the Options field
+	add r15, r14					; add the affset in bytes of the Options field to the Layer 4 Header offset
 	zero Header_Length, 4
 	mov DWORD [Header_Length], r14d                 ; Move the potential options length value into Header_Length for later use
 	lea r15, [Packet_Buffer + 34]			; Load the Effective Address of the Options field offset into r15
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	zero buffer, 100
 	htoa r15, r14, buffer				; Turn the Options bytes into the ASCII form of the raw bytes
 	mov eax, 0x1					; Write the ASCII Options bytes to terminal
@@ -442,11 +447,7 @@ IPv6:
 	mov esi, Traffic_Class_Message
 	mov edx, Trfc_Cls_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	htoa buffer, 1, buffer				; Turn the Traffic Class into the ASCII form of the raw byte
 	mov eax, 0x1					; Write the Traffic Class ASCII byte to terminal
 	mov edi, 0x1
@@ -459,11 +460,7 @@ IPv6:
 	mov esi, Flow_Label_Message
 	mov edx, Flw_Lbl_Msg_Len
 	syscall
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	movzx r14, DWORD [Packet_Buffer + 14]		; mov the first DWORD of the IPv6 Header into r14 to get the Flow Label bits
 	and r14, 0x0fffff				; Clear all bits in r14 but the Flow Label bits
 	mov DWORD [buffer], r14d			; Store the Flow Label DWORD into buffer
@@ -484,11 +481,7 @@ IPv6:
 	mov WORD [buffer], r14w				; mov the Payload Length value into buffer
 	lea r14, [buffer + 2]				; Load the Effective Address of the buffer offset by 2 to compensate for the Payload Length WORD value
 	htoa buffer, 2, r14				; Turn the Payload Length value into the ASCII form of the raw bytes
-	mov eax, 0x1
-	mov edi, 0x1
-	mov esi, Hex_Symbol
-	mov edx, 0x2
-	syscall
+	hex
 	mov eax, 0x1					; Write the ASCII Payload Length value to terminal
 	mov edi, 0x1
 	lea esi, [buffer + 2]
@@ -541,10 +534,102 @@ IPv6:
 	IPv6_Address r14				; Write the Destination Address to terminal
 	newline
 	zero buffer, 100
+	lea r15, [Packet_Buffer + 54]			; Load the Effective Address of the Layer 4 Header offset
+	movzx r8, BYTE [Packet_Buffer + 20]
+	cmp r8, 0x6
+	je TCP
+	cmp r8, 0x11
+	je UDP
+	newline
+	jmp Next_Packet
+
+TCP:
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, TCP_Header_Message
+	mov edx, TCP_Hdr_Msg_Len
+	syscall
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Source_Port_Message
+	mov edx, Src_Prt_Msg_Len
+	syscall
+	hex
+	movzx r9, WORD [r15]				; mov the Source Port from the base Layer 4 address into r9
+	rol r9w, 0x8					; Rotate the bits left by 8 in the 16 bit form of r9 to do ntohs since the Source Port comes in Little Endian
+	zero buffer, 100
+	mov WORD [buffer], r9w				; mov the Source Port WORD into the buffer
+	lea r14, [buffer + 2]				; Load the Effective Address of the buffer offset by 4 to compensate for the Source Port WORD
+	htoa buffer, 2, r14				; Turn the Source Port value into the ASCII form of the raw bytes
+	mov eax, 0x1					; Write the Source Port ASCII value to terminal
+	mov edi, 0x1
+	mov rsi, r14
+	mov edx, 0x4
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Destination_Port_Message
+	mov edx, Dstntn_Prt_Msg_Len
+	syscall
+	movzx r14, WORD [r15 + 2]
+	mov WORD [buffer], r14w
+	lea r14, [buffer + 2]
+	htoa buffer, 2, r14
+	hex
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x4
+	syscall
+	newline
+	movzx r14, DWORD [r15 + 4]
+	zero buffer, 100
+	mov DWORD [buffer], r14d
+	lea r14, [buffer + 4]
+	htoa buffer, 4, r14
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Sequence_Number_Message
+	mov edx, Sqnce_Nmbr_Msg_Len
+	syscall
+	hex
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x8
+	syscall
+	newline
+	movzx r14, DWORD [r15 + 8]
+	zero buffer, 100
+	mov DWORD [buffer], r14d
+	lea r14, [buffer + 4]
+	htoa buffer, 4, r14
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Acknowledgment_Number_Message
+	mov edx, Acknldgmnt_Nmbr_Msg_Len
+	syscall
+	hex
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x8
+	syscall
+	newline
+	jmp Next_Packet
+UDP:
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, UDP_Header_Message
+	mov edx, UDP_Hdr_Msg_Len
+	syscall
 	jmp Next_Packet
 
 Next_Packet:
-	zero Packet_Buffer, 65535
+	zero Protocol, 1
+	zero Packet_Buffer, [Packet_Length]
+	zero Packet_Length, 4
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Packet_Divider
@@ -565,12 +650,16 @@ struct_sockaddr_ifr_hwaddr:
         sa_data db (14) dup (0)
 
 STRUCT_IFREQ:
-        ifr_name db "wlan0", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ifr_name db "wlan0", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ifr_hwaddr dq struct_sockaddr_ifr_hwaddr
 
 STRUCT_IFREQ_ifr_ifindex:
 	index_ifr_name db "wlan0", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	index_ifr_ifindex dd 0
+
+STRUCT_IFREQ_ifr_ifflags:
+	flags_ifr_name db "wlan0", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	flags_ifr_ifflags dw 0
 fd:
 	dd 0
 
@@ -595,7 +684,7 @@ sockaddr_ll_len equ $-struct_sockaddr_ll
 index:
 	db 0, 0, 0xa
 
-Packet_Length:
+Packet_Length:		; Total byte lenggth of packet
 	dd 0
 
 Packet_Message:
@@ -626,9 +715,6 @@ dstlen equ $-Dst_Address
 Ethernet_Protocol_Message:
 	db "Ethernet Protocol: "
 Ethrnt_Prtcl_Msg_Len equ $-Ethernet_Protocol_Message
-
-Hex_Symbol:
-        db "0x"
 
 ; IPv4
 IPv4_Header_Message:
@@ -727,7 +813,33 @@ Hop_Limit_Message:
 	db "Hop Limit: "
 Hp_Lmt_Msg_Len equ $-Hop_Limit_Message
 
-Header_Length:
+; TCP
+TCP_Header_Message:
+	db "TCP:", 0xa
+TCP_Hdr_Msg_Len equ $-TCP_Header_Message
+
+Source_Port_Message:
+	db "Source Port: "
+Src_Prt_Msg_Len equ $-Source_Port_Message
+
+Destination_Port_Message:
+	db "Destination Port: "
+Dstntn_Prt_Msg_Len equ $-Destination_Port_Message
+
+Sequence_Number_Message:
+	db "Sequence Number: "
+Sqnce_Nmbr_Msg_Len equ $-Sequence_Number_Message
+
+Acknowledgment_Number_Message:
+	db "Acknowldgement Number: "
+Acknldgmnt_Nmbr_Msg_Len equ $-Acknowledgment_Number_Message
+
+; UDP
+UDP_Header_Message:
+	db "UDP:", 0xa
+UDP_Hdr_Msg_Len equ $-UDP_Header_Message
+
+Header_Length:			; Potential Options byte length
 	dd 0
 
 section .bss
