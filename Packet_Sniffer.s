@@ -572,46 +572,46 @@ TCP:
 	mov esi, Destination_Port_Message
 	mov edx, Dstntn_Prt_Msg_Len
 	syscall
-	movzx r14, WORD [r15 + 2]
-	mov WORD [buffer], r14w
-	lea r14, [buffer + 2]
-	htoa buffer, 2, r14
+	movzx r14, WORD [r15 + 2]			; mov the Destination Port into r14
+	mov WORD [buffer], r14w				; mov the Destination Port value into buffer
+	lea r14, [buffer + 2]				; Load the Effective Address of the buffer offset by 2 bytes to compensate for the Destination Port value
+	htoa buffer, 2, r14				; Turn the Destination Port into the ASCII form of the raw bytes
 	hex
-	mov eax, 0x1
+	mov eax, 0x1					; Write the Destination Port ASCII value to terminal
 	mov edi, 0x1
 	mov esi, r14d
 	mov edx, 0x4
 	syscall
 	newline
-	movzx r14, DWORD [r15 + 4]
+	movzx r14, DWORD [r15 + 4]			; mov the DWORD Sequence Number value into r14
 	zero buffer, 100
-	mov DWORD [buffer], r14d
-	lea r14, [buffer + 4]
-	htoa buffer, 4, r14
+	mov DWORD [buffer], r14d			; mov the DWORD Sequence Port value into the buffer
+	lea r14, [buffer + 4]				; Load the Effective Address of the buffer offset by 4 bytes to compensate for the Sequence Number DWORD value
+	htoa buffer, 4, r14				; Turn the Sequence Number into the ASCII form of the raw bytes
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Sequence_Number_Message
 	mov edx, Sqnce_Nmbr_Msg_Len
 	syscall
 	hex
-	mov eax, 0x1
+	mov eax, 0x1					; Write the Sequence Number ASCII value to terminal
 	mov edi, 0x1
 	mov esi, r14d
 	mov edx, 0x8
 	syscall
 	newline
-	movzx r14, DWORD [r15 + 8]
+	movzx r14, DWORD [r15 + 8]			; mov the Acknowledgment Number DWORD value into r14
 	zero buffer, 100
-	mov DWORD [buffer], r14d
-	lea r14, [buffer + 4]
-	htoa buffer, 4, r14
+	mov DWORD [buffer], r14d			; mov the Acknowledgment Number into the buffer
+	lea r14, [buffer + 4]				; Load the Effective ADdress of the buffer offset by 4 bytes to compensate for the Acknowledgment Number DWORD value
+	htoa buffer, 4, r14				; Turn the Acknowledgment Number into the ASCII form of the raw bytes
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Acknowledgment_Number_Message
 	mov edx, Acknldgmnt_Nmbr_Msg_Len
 	syscall
 	hex
-	mov eax, 0x1
+	mov eax, 0x1					; Write the Acknowledgment Number ASCII value to terminal
 	mov edi, 0x1
 	mov esi, r14d
 	mov edx, 0x8
