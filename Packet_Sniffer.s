@@ -369,6 +369,7 @@ IPv4:
 	and r8, 0xf					; Clear the Version bits to only have the Internet Header Length bits
 	shl r8, 0x2					; Shift r8 left by 2 to times it by 4 to get the amount of bytes in the Internet Header
 	add r15, r8					; Add the amount of bytes in the Internet Header including Options to r15, Should be the exact offset of the TCP/UDP Header including options
+	mov QWORD [Layer_4_Base_Pointer], r15
 	call IPv4_Options
 	newline
 	movzx r8, BYTE [Protocol]
@@ -533,6 +534,7 @@ IPv6:
 	htoa buffer, 16, r14				; Turn the Destination Address into the ASCII form of the raw bytes
 	IPv6_Address r14				; Write the Destination Address to terminal
 	newline
+	newline
 	zero buffer, 100
 	lea r15, [Packet_Buffer + 54]			; Load the Effective Address of the Layer 4 Header offset
 	movzx r8, BYTE [Packet_Buffer + 20]
@@ -540,7 +542,6 @@ IPv6:
 	je TCP
 	cmp r8, 0x11
 	je UDP
-	newline
 	jmp Next_Packet
 
 TCP:
@@ -573,6 +574,7 @@ TCP:
 	mov edx, Dstntn_Prt_Msg_Len
 	syscall
 	movzx r14, WORD [r15 + 2]			; mov the Destination Port into r14
+	zero buffer, 3
 	mov WORD [buffer], r14w				; mov the Destination Port value into buffer
 	lea r14, [buffer + 2]				; Load the Effective Address of the buffer offset by 2 bytes to compensate for the Destination Port value
 	htoa buffer, 2, r14				; Turn the Destination Port into the ASCII form of the raw bytes
@@ -617,7 +619,195 @@ TCP:
 	mov edx, 0x8
 	syscall
 	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Data_Offset_Message
+	mov edx, Dta_Offst_Msg_Len
+	syscall
+	movzx r8, BYTE [r15 + 12]
+	shr r8, 0x4
+	zero buffer, 100
+	mov BYTE [buffer], r8b
+	htoib buffer, (buffer + 1)
+	newline
+	movzx r14, BYTE [r15 + 13]
+	mov r13, r14
+	and r13, 0x80
+	shr r13, 0x7
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Congestion_Window_Reduced_Message
+	mov edx, Cngstn_Wndw_Rdcd_Msg_Len
+	syscall
+	mov BYTE [buffer], r13b
+	htoib buffer, (buffer + 1)
+	zero buffer, 3
+	newline
+	xor r13, r13
+	mov r13, r14
+	and r13, 0x40
+	shr r13, 0x6
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, ECN_Echo_Message
+	mov edx, ECN_Ech_Msg_Len
+	syscall
+	mov BYTE [buffer], r13b
+	htoib buffer, (buffer + 1)
+	zero buffer, 3
+	newline
+	xor r13, r13
+	mov r13, r14
+	and r13, 0x20
+	shr r13, 0x5
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Urgent_Pointer_Flag_Message
+	mov edx, Urgnt_Pntr_Flg_Msg_Len
+	syscall
+	htoib buffer, (buffer + 1)
+	zero buffer, 3
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Acknowledgment_Flag_Message
+	mov edx, Acknldgmnt_Flg_Msg_Len
+	syscall
+	mov r13, r14
+	and r13, 0x10
+	shr r13, 0x4
+	zero buffer, 3
+	mov BYTE [buffer], r13b
+	htoib buffer, (buffer + 1)
+	newline
+	zero buffer, 3
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Push_Flag_Message
+	mov edx, Psh_Flg_Msg_Len
+	syscall
+	mov r13, r14
+	and r13, 0x8
+	shr r13, 0x3
+	mov BYTE [buffer], r13b
+	htoib buffer, (buffer + 1)
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Reset_Flag_Message
+	mov edx, Rst_Flg_Msg_Len
+	syscall
+	zero buffer, 3
+	mov r13, r14
+	and r13, 0x4
+	shr r13, 0x2
+	mov BYTE [buffer], r13b
+	htoib buffer, (buffer + 1)
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Synchronize_Flag_Message
+	mov edx, Syncrnz_Flg_Msg_Len
+	syscall
+	mov r13, r14
+	and r13, 0x2
+	shr r13, 0x1
+	mov BYTE [buffer], r13b
+	htoib buffer, (buffer + 1)
+	newline
+	zero buffer, 3
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Finish_Flag_Message
+	mov edx, Fnsh_Flg_Msg_Len
+	syscall
+	mov r13, r14
+	and r13, 0x1
+	mov BYTE [buffer], r13b
+	htoib buffer, (buffer + 1)
+	newline
+	xor r13, r13
+	mov r14w, WORD [r15 + 14]
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Window_Message
+	mov edx, Wndw_Msg_Len
+	syscall
+	mov WORD [buffer], r14w
+	lea r14, [buffer + 2]
+	htoa buffer, 2, r14
+	hex
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x4
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, TCP_Checksum_Message
+	mov edx, TCP_Chcksm_Msg_Len
+	syscall
+	hex
+	zero buffer, 100
+	xor r14, r14
+	movzx r14, WORD [r15 + 16]
+	mov WORD [buffer], r14w
+	lea r14, [buffer + 2]
+	htoa buffer, 2, r14
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x4
+	syscall
+	newline
+	movzx r14, WORD [r15 + 18]
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Urgent_Pointer_Message
+	mov edx, Urgnt_Pntr_Msg_Len
+	syscall
+	hex
+	zero buffer, 100
+	mov WORD [buffer], r14w
+	lea r14, [buffer + 2]
+	htoa buffer, 2, r14
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, 0x4
+	syscall
+	newline
+	movzx r14, BYTE [r15 + 12]
+	and r14, 0xf0
+	shr r14, 0x4
+	sub r14, 0x5
+	cmp r14, 0x0
+	jle Next_Packet
+	call TCP_Options
 	jmp Next_Packet
+
+TCP_Options:
+	shl r14, 0x2
+	mov BYTE [TCP_Header_Length], r14b
+	lea r8, [r15 + 20]
+	zero buffer, 100
+	htoa r8, r14, buffer
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, TCP_Options_Message
+	mov edx, TCP_Optns_Msg_Len
+	syscall
+	hex
+	shl r14, 0x1
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, buffer
+	mov edx, r14d
+	syscall
+	newline
+	ret
+
 UDP:
 	mov eax, 0x1
 	mov edi, 0x1
@@ -788,6 +978,9 @@ ARP_Hdr_Msg_Len equ $-ARP_Header_Message
 Arp:
 	db 0
 
+Layer_4_Base_Pointer:
+	dq 0
+
 ; IPv6
 IPv6_Header_Message:
 	db "IPv6 Header:", 0xa
@@ -834,6 +1027,58 @@ Acknowledgment_Number_Message:
 	db "Acknowldgement Number: "
 Acknldgmnt_Nmbr_Msg_Len equ $-Acknowledgment_Number_Message
 
+Data_Offset_Message:
+	db "Data Offset: "
+Dta_Offst_Msg_Len equ $-Data_Offset_Message
+
+Congestion_Window_Reduced_Message:
+	db "Congestion Window Reduced Flag: "
+Cngstn_Wndw_Rdcd_Msg_Len equ $-Congestion_Window_Reduced_Message
+
+ECN_Echo_Message:
+	db "ECN Echo Flag: "
+ECN_Ech_Msg_Len equ $-ECN_Echo_Message
+
+Urgent_Pointer_Flag_Message:
+	db "Urgent Pointer Signifigant Flag: "
+Urgnt_Pntr_Flg_Msg_Len equ $-Urgent_Pointer_Flag_Message
+
+Acknowledgment_Flag_Message:
+	db "Acknowledgment Flag: "
+Acknldgmnt_Flg_Msg_Len equ $-Acknowledgment_Flag_Message
+
+Push_Flag_Message:
+	db "Push Flag: "
+Psh_Flg_Msg_Len equ $-Push_Flag_Message
+
+Reset_Flag_Message:
+	db "Reset Flag: "
+Rst_Flg_Msg_Len equ $-Reset_Flag_Message
+
+Synchronize_Flag_Message:
+	db "Synchronize Flag: "
+Syncrnz_Flg_Msg_Len equ $-Synchronize_Flag_Message
+
+Finish_Flag_Message:
+	db "Finish Flag: "
+Fnsh_Flg_Msg_Len equ $-Finish_Flag_Message
+
+Window_Message:
+	db "Window: "
+Wndw_Msg_Len equ $-Window_Message
+
+TCP_Checksum_Message:
+	db "TCP Checksum: "
+TCP_Chcksm_Msg_Len equ $-TCP_Checksum_Message
+
+Urgent_Pointer_Message:
+	db "Urgent Pointer: "
+Urgnt_Pntr_Msg_Len equ $-Urgent_Pointer_Message
+
+TCP_Options_Message:
+	db "TCP Options: "
+TCP_Optns_Msg_Len equ $-TCP_Options_Message
+
 ; UDP
 UDP_Header_Message:
 	db "UDP:", 0xa
@@ -841,6 +1086,9 @@ UDP_Hdr_Msg_Len equ $-UDP_Header_Message
 
 Header_Length:			; Potential Options byte length
 	dd 0
+
+TCP_Header_Length:
+	dd 0			; Potential TCP Options byte length
 
 section .bss
 Packet_Buffer:
