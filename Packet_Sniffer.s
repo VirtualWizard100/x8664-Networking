@@ -814,6 +814,68 @@ UDP:
 	mov esi, UDP_Header_Message
 	mov edx, UDP_Hdr_Msg_Len
 	syscall
+	movzx r8, WORD [r15]
+	zero buffer, 6
+	mov WORD [buffer], r8w
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, UDP_Source_Port_Message
+	mov edx, UDP_Src_Prt_Msg_Len
+	syscall
+	hex
+	htoa buffer, 2, (buffer + 2)
+	mov eax, 0x1
+	mov edi, 0x1
+	lea esi, [buffer + 2]
+	mov edx, 0x4
+	syscall
+	newline
+	movzx r8, WORD [r15 + 2]
+	zero buffer, 6
+	mov WORD [buffer], r8w
+	htoa buffer, 2, (buffer + 2)
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, UDP_Destination_Port_Message
+	mov edx, UDP_Dst_Prt_Msg_Len
+	syscall
+	hex
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, (buffer + 2)
+	mov edx, 0x4
+	syscall
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Length_Message
+	mov edx, Lngth_Msg_Len
+	syscall
+	hex
+	movzx r8, WORD [r15 + 4]
+	mov WORD [buffer], r8w
+	htoa buffer, 2, (buffer + 2)
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, (buffer + 2)
+	mov edx, 0x4
+	syscall
+	newline
+	movzx r8, WORD [r15 + 6]
+	zero buffer, 6
+	mov WORD [buffer], r8w
+	htoa buffer, 2, (buffer + 2)
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, UDP_Checksum_Message
+	mov edx, UDP_Chksm_Msg_Len
+	syscall
+	hex
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, (buffer + 2)
+	mov edx, 0x4
+	syscall
 	jmp Next_Packet
 
 Next_Packet:
@@ -1083,6 +1145,23 @@ TCP_Optns_Msg_Len equ $-TCP_Options_Message
 UDP_Header_Message:
 	db "UDP:", 0xa
 UDP_Hdr_Msg_Len equ $-UDP_Header_Message
+
+UDP_Source_Port_Message:
+	db "Source Port: "
+UDP_Src_Prt_Msg_Len equ $-UDP_Source_Port_Message
+
+UDP_Destination_Port_Message:
+	db "Destination Port: "
+UDP_Dst_Prt_Msg_Len equ $-UDP_Destination_Port_Message
+
+UDP_Checksum_Message:
+	db "Checksum: "
+UDP_Chksm_Msg_Len equ $-UDP_Checksum_Message
+
+Length_Message:
+	db "Length: "
+Lngth_Msg_Len equ $-Length_Message
+
 
 Header_Length:			; Potential Options byte length
 	dd 0
