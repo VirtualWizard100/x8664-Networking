@@ -177,6 +177,7 @@ Ethernet_Protocol:
 	jmp Next_Packet
 
 IPv4:
+	mov DWORD [Layer_3_Length], 20
 	mov eax, 0x1				; Write "IPv4 Header:\n" to terminal
 	mov edi, 0x1
 	mov esi, IPv4_Header_Message
@@ -369,7 +370,7 @@ IPv4:
 	and r8, 0xf					; Clear the Version bits to only have the Internet Header Length bits
 	shl r8, 0x2					; Shift r8 left by 2 to times it by 4 to get the amount of bytes in the Internet Header
 	add r15, r8					; Add the amount of bytes in the Internet Header including Options to r15, Should be the exact offset of the TCP/UDP Header including options
-	mov QWORD [Layer_4_Base_Pointer], r15
+	mov QWORD [Layer_3_Base_Pointer], r15
 	call IPv4_Options
 	newline
 	movzx r8, BYTE [Protocol]
@@ -393,7 +394,8 @@ continue:
 	mov edx, Optns_Msg_Len
 	syscall
 	shl r14, 0x2					; Shift the value in r14 left by to to multiply the value by 4 to get the amount of bytes in the Options field
-	add r15, r14					; add the affset in bytes of the Options field to the Layer 4 Header offset
+	add DWORD [Layer_3_Length], r14d		; Add the Options byte amount to the Layer_3_Length
+	add r15, r14					; add the offset in bytes of the Options field to the Layer 4 Header offset
 	zero Header_Length, 4
 	mov DWORD [Header_Length], r14d                 ; Move the potential options length value into Header_Length for later use
 	lea r15, [Packet_Buffer + 34]			; Load the Effective Address of the Options field offset into r15
@@ -418,6 +420,7 @@ ARP:
 	jmp IPv4
 
 IPv6:
+	mov DWORD [Layer_3_Length], 40
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, IPv6_Header_Message
@@ -537,6 +540,7 @@ IPv6:
 	newline
 	zero buffer, 100
 	lea r15, [Packet_Buffer + 54]			; Load the Effective Address of the Layer 4 Header offset
+	mov QWORD [Layer_3_Base_Pointer], r15
 	movzx r8, BYTE [Packet_Buffer + 20]
 	cmp r8, 0x6
 	je TCP
@@ -545,6 +549,7 @@ IPv6:
 	jmp Next_Packet
 
 TCP:
+	mov BYTE [Layer_4_Length], 20
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, TCP_Header_Message
@@ -783,13 +788,13 @@ TCP:
 	shr r14, 0x4
 	sub r14, 0x5
 	cmp r14, 0x0
-	jle Next_Packet
+	jle Data
 	call TCP_Options
-	jmp Next_Packet
+	jmp Data
 
 TCP_Options:
-	shl r14, 0x2
-	mov BYTE [TCP_Header_Length], r14b
+	shl r14, 0x2				; Multiply the Header Length field by 4 to get the amount in bytes
+	add BYTE [Layer_4_Length], r14b		; Add the Options Byte amount to the layer 4 byte length
 	lea r8, [r15 + 20]
 	zero buffer, 100
 	htoa r8, r14, buffer
@@ -876,12 +881,37 @@ UDP:
 	mov esi, (buffer + 2)
 	mov edx, 0x4
 	syscall
+	mov DWORD [Layer_4_Length], 8
+	newline
+	jmp Data
+
+Data:
+	newline
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, Data_Message
+	mov edx, Dta_Msg_Len
+	syscall
+	movzx r13, DWORD [Layer_4_Length]
+	lea r14, [r15 + r13]
+	add r13, [Layer_3_Length]
+	add r13, 14
+	movzx r12, DWORD [Packet_Length]
+	sub r12, r13
+	mov eax, 0x1
+	mov edi, 0x1
+	mov esi, r14d
+	mov edx, r12d
+	syscall
+	newline
 	jmp Next_Packet
 
 Next_Packet:
 	zero Protocol, 1
 	zero Packet_Buffer, [Packet_Length]
 	zero Packet_Length, 4
+	zero Layer_3_Length, 4
+	zero Layer_4_Length, 4
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Packet_Divider
@@ -1040,7 +1070,7 @@ ARP_Hdr_Msg_Len equ $-ARP_Header_Message
 Arp:
 	db 0
 
-Layer_4_Base_Pointer:
+Layer_3_Base_Pointer:
 	dq 0
 
 ; IPv6
@@ -1162,12 +1192,20 @@ Length_Message:
 	db "Length: "
 Lngth_Msg_Len equ $-Length_Message
 
+; Data
+Data_Message:
+	db "Data:", 0xa
+Dta_Msg_Len equ $-Data_Message
+
 
 Header_Length:			; Potential Options byte length
 	dd 0
 
-TCP_Header_Length:
-	dd 0			; Potential TCP Options byte length
+Layer_3_Length:			; Potential IP/IPv6 + Options byte Length
+	dd 0
+
+Layer_4_Length:
+	dd 0			; Potential TCP/UDP + Options byte length
 
 section .bss
 Packet_Buffer:
