@@ -177,7 +177,7 @@ Ethernet_Protocol:
 	jmp Next_Packet
 
 IPv4:
-	mov DWORD [Layer_3_Length], 20
+	mov DWORD [Layer_3_Length], 20		; mov the minimum byte amount of the IPv4 Header into Layer_3_Length
 	mov eax, 0x1				; Write "IPv4 Header:\n" to terminal
 	mov edi, 0x1
 	mov esi, IPv4_Header_Message
@@ -370,7 +370,6 @@ IPv4:
 	and r8, 0xf					; Clear the Version bits to only have the Internet Header Length bits
 	shl r8, 0x2					; Shift r8 left by 2 to times it by 4 to get the amount of bytes in the Internet Header
 	add r15, r8					; Add the amount of bytes in the Internet Header including Options to r15, Should be the exact offset of the TCP/UDP Header including options
-	mov QWORD [Layer_3_Base_Pointer], r15
 	call IPv4_Options
 	newline
 	movzx r8, BYTE [Protocol]
@@ -396,8 +395,6 @@ continue:
 	shl r14, 0x2					; Shift the value in r14 left by to to multiply the value by 4 to get the amount of bytes in the Options field
 	add DWORD [Layer_3_Length], r14d		; Add the Options byte amount to the Layer_3_Length
 	add r15, r14					; add the offset in bytes of the Options field to the Layer 4 Header offset
-	zero Header_Length, 4
-	mov DWORD [Header_Length], r14d                 ; Move the potential options length value into Header_Length for later use
 	lea r15, [Packet_Buffer + 34]			; Load the Effective Address of the Options field offset into r15
 	hex
 	zero buffer, 100
@@ -540,7 +537,6 @@ IPv6:
 	newline
 	zero buffer, 100
 	lea r15, [Packet_Buffer + 54]			; Load the Effective Address of the Layer 4 Header offset
-	mov QWORD [Layer_3_Base_Pointer], r15
 	movzx r8, BYTE [Packet_Buffer + 20]
 	cmp r8, 0x6
 	je TCP
@@ -549,7 +545,7 @@ IPv6:
 	jmp Next_Packet
 
 TCP:
-	mov BYTE [Layer_4_Length], 20
+	mov BYTE [Layer_4_Length], 20			; mov the minimum byte amount of the TCP Header into Layer_4_Length
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, TCP_Header_Message
@@ -629,48 +625,47 @@ TCP:
 	mov esi, Data_Offset_Message
 	mov edx, Dta_Offst_Msg_Len
 	syscall
-	movzx r8, BYTE [r15 + 12]
-	shr r8, 0x4
+	movzx r8, BYTE [r15 + 12]			; mov the byte that the Data Offset value is in into r8
+	shr r8, 0x4					; Shift the byte right by 4 bits to only have the Data Offset value
 	zero buffer, 100
-	mov BYTE [buffer], r8b
-	htoib buffer, (buffer + 1)
+	mov BYTE [buffer], r8b				; mov the Data Offset value into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw Data Offset byte to terminal
 	newline
-	movzx r14, BYTE [r15 + 13]
-	mov r13, r14
-	and r13, 0x80
-	shr r13, 0x7
+	movzx r14, BYTE [r15 + 13]			; mov the Flags into r14
+	mov r13, r14					; mov the Flags in r14 into r13
+	and r13, 0x80					; Clear all Flags but the Congestion Window Reduced Flag
+	shr r13, 0x7					; Shift it right by 7 bits to put it into the least signifigant bit
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Congestion_Window_Reduced_Message
 	mov edx, Cngstn_Wndw_Rdcd_Msg_Len
 	syscall
-	mov BYTE [buffer], r13b
-	htoib buffer, (buffer + 1)
+	mov BYTE [buffer], r13b				; mov the Congestion Window Reduced Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
 	zero buffer, 3
 	newline
-	xor r13, r13
-	mov r13, r14
-	and r13, 0x40
-	shr r13, 0x6
+	mov r13, r14					; mov the Flags in r14 into r13 again
+	and r13, 0x40					; Clear all Flags except the ECN Echo Flag
+	shr r13, 0x6					; Shift it right by 6 bits to put it in the least signifigant bit
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, ECN_Echo_Message
 	mov edx, ECN_Ech_Msg_Len
 	syscall
-	mov BYTE [buffer], r13b
-	htoib buffer, (buffer + 1)
+	mov BYTE [buffer], r13b				; mov the ECN Echo Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
 	zero buffer, 3
 	newline
-	xor r13, r13
-	mov r13, r14
-	and r13, 0x20
-	shr r13, 0x5
+	mov r13, r14					; mov the flag int r14 into r13
+	and r13, 0x20					; Clear all flags but the Urgent Pointer Flag
+	shr r13, 0x5					; Shift it right by 5 to put it in the least signifigant bit
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Urgent_Pointer_Flag_Message
 	mov edx, Urgnt_Pntr_Flg_Msg_Len
 	syscall
-	htoib buffer, (buffer + 1)
+	mov BYTE [buffer], r13b				; mov the Urgent Pointer Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
 	zero buffer, 3
 	newline
 	mov eax, 0x1
@@ -678,73 +673,73 @@ TCP:
 	mov esi, Acknowledgment_Flag_Message
 	mov edx, Acknldgmnt_Flg_Msg_Len
 	syscall
-	mov r13, r14
-	and r13, 0x10
-	shr r13, 0x4
+	mov r13, r14					; mov the flags in r14 into r13
+	and r13, 0x10					; Clear all flags but the Acknowledgment Flag
+	shr r13, 0x4					; Shift it right 4 to put it in the least signifigant bit
+	mov BYTE [buffer], r13b				; mov the Acknowledgment Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
 	zero buffer, 3
-	mov BYTE [buffer], r13b
-	htoib buffer, (buffer + 1)
 	newline
-	zero buffer, 3
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Push_Flag_Message
 	mov edx, Psh_Flg_Msg_Len
 	syscall
-	mov r13, r14
-	and r13, 0x8
-	shr r13, 0x3
-	mov BYTE [buffer], r13b
-	htoib buffer, (buffer + 1)
+	mov r13, r14					; mov the flags in r14 into r13
+	and r13, 0x8					; Clear all flags but the Push Flag
+	shr r13, 0x3					; Shift it right by 3 to put it in the least signifigant bit
+	mov BYTE [buffer], r13b				; mov the Push Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
+	zero buffer, 3
 	newline
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Reset_Flag_Message
 	mov edx, Rst_Flg_Msg_Len
 	syscall
+	mov r13, r14					; mov the flags in r14 into r13
+	and r13, 0x4					; Clear all flags but the Reset Flag
+	shr r13, 0x2					; Shift it right by 2 to put it in the least signifigant bit
+	mov BYTE [buffer], r13b				; mov the Reset Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
 	zero buffer, 3
-	mov r13, r14
-	and r13, 0x4
-	shr r13, 0x2
-	mov BYTE [buffer], r13b
-	htoib buffer, (buffer + 1)
 	newline
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Synchronize_Flag_Message
 	mov edx, Syncrnz_Flg_Msg_Len
 	syscall
-	mov r13, r14
-	and r13, 0x2
-	shr r13, 0x1
-	mov BYTE [buffer], r13b
-	htoib buffer, (buffer + 1)
-	newline
+	mov r13, r14					; mov the flags in r14 into r13
+	and r13, 0x2					; Clear all flags in but the Synchronize Flag
+	shr r13, 0x1					; Shift it right by 1 to put it in the least signifigant bit
+	mov BYTE [buffer], r13b				; mov the Synchronize Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
 	zero buffer, 3
+	newline
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Finish_Flag_Message
 	mov edx, Fnsh_Flg_Msg_Len
 	syscall
-	mov r13, r14
-	and r13, 0x1
-	mov BYTE [buffer], r13b
-	htoib buffer, (buffer + 1)
+	mov r13, r14					; mov the flags in r14 into r13
+	and r13, 0x1					; Clear all flags but the Finish Flag
+	mov BYTE [buffer], r13b				; mov the Finish Flag into buffer
+	htoib buffer, (buffer + 1)			; Write the ASCII form of the raw bit to terminal
+	zero buffer, 3
 	newline
 	xor r13, r13
-	mov r14w, WORD [r15 + 14]
+	movzx r14, WORD [r15 + 14]			; mov the Window Size value into r14
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Window_Message
 	mov edx, Wndw_Msg_Len
 	syscall
-	mov WORD [buffer], r14w
-	lea r14, [buffer + 2]
-	htoa buffer, 2, r14
+	mov WORD [buffer], r14w				; mov the Window Size value into buffer
+	htoa buffer, 2, (buffer + 2)			; Turn the Window Size value into the ASCII form of the raw bytes
 	hex
-	mov eax, 0x1
+	mov eax, 0x1					; Write the Window Size ASCII value to terminal
 	mov edi, 0x1
-	mov esi, r14d
+	mov esi, (buffer + 2)
 	mov edx, 0x4
 	syscall
 	newline
@@ -756,17 +751,16 @@ TCP:
 	hex
 	zero buffer, 100
 	xor r14, r14
-	movzx r14, WORD [r15 + 16]
-	mov WORD [buffer], r14w
-	lea r14, [buffer + 2]
-	htoa buffer, 2, r14
-	mov eax, 0x1
+	movzx r14, WORD [r15 + 16]			; mov the TCP Checksum value into r14
+	mov WORD [buffer], r14w				; mov the TCP Checksum value into buffer
+	htoa buffer, 2, (buffer + 2)			; Turn the TCP Checksum value into the ASCII form of the raw bytes
+	mov eax, 0x1					; Write the ASCII TCP Checksum to terminal
 	mov edi, 0x1
-	mov esi, r14d
+	mov esi, (buffer + 2)
 	mov edx, 0x4
 	syscall
 	newline
-	movzx r14, WORD [r15 + 18]
+	movzx r14, WORD [r15 + 18]			; mov the Urgent Pointer value into r14
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, Urgent_Pointer_Message
@@ -774,19 +768,18 @@ TCP:
 	syscall
 	hex
 	zero buffer, 100
-	mov WORD [buffer], r14w
-	lea r14, [buffer + 2]
-	htoa buffer, 2, r14
-	mov eax, 0x1
+	mov WORD [buffer], r14w				; mov the Urgent Pointer value into buffer
+	htoa buffer, 2, (buffer + 2)			; Turn the Urgent Pointer value into the ASCII form of the raw bytes
+	mov eax, 0x1					; Write the ASCII Urgent Pointer value to terminal
 	mov edi, 0x1
-	mov esi, r14d
+	mov esi, (buffer + 2)
 	mov edx, 0x4
 	syscall
 	newline
-	movzx r14, BYTE [r15 + 12]
-	and r14, 0xf0
-	shr r14, 0x4
-	sub r14, 0x5
+	movzx r14, BYTE [r15 + 12]			; mov the TCP Header Length value byte into r14
+	and r14, 0xf0					; Clear all bits but the TCP Header Length bits
+	shr r14, 0x4					; Shift it right by 4 bits to put it in the least signifigant bit
+	sub r14, 0x5					; Subtract the minimum amount of DWORDS in the TCP Header from r14
 	cmp r14, 0x0
 	jle Data
 	call TCP_Options
@@ -795,16 +788,16 @@ TCP:
 TCP_Options:
 	shl r14, 0x2				; Multiply the Header Length field by 4 to get the amount in bytes
 	add BYTE [Layer_4_Length], r14b		; Add the Options Byte amount to the layer 4 byte length
-	lea r8, [r15 + 20]
+	lea r8, [r15 + 20]			; Load the Effective Address of the Options into r8
 	zero buffer, 100
-	htoa r8, r14, buffer
+	htoa r8, r14, buffer			; Turn it into the ASCII form of the raw bytes
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, TCP_Options_Message
 	mov edx, TCP_Optns_Msg_Len
 	syscall
 	hex
-	shl r14, 0x1
+	shl r14, 0x1				; Write the ASCII Options bytes to terminal
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, buffer
@@ -819,17 +812,17 @@ UDP:
 	mov esi, UDP_Header_Message
 	mov edx, UDP_Hdr_Msg_Len
 	syscall
-	movzx r8, WORD [r15]
+	movzx r8, WORD [r15]			; mov the Source Port into r8
 	zero buffer, 6
-	mov WORD [buffer], r8w
+	mov WORD [buffer], r8w			; mov the Source Port into buffer
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, UDP_Source_Port_Message
 	mov edx, UDP_Src_Prt_Msg_Len
 	syscall
 	hex
-	htoa buffer, 2, (buffer + 2)
-	mov eax, 0x1
+	htoa buffer, 2, (buffer + 2)		; Turn the Source Port into the ASCII form of the raw bytes
+	mov eax, 0x1				; Write the Source Port ASCII value to terminal
 	mov edi, 0x1
 	lea esi, [buffer + 2]
 	mov edx, 0x4
@@ -892,12 +885,12 @@ Data:
 	mov esi, Data_Message
 	mov edx, Dta_Msg_Len
 	syscall
-	movzx r13, DWORD [Layer_4_Length]
-	lea r14, [r15 + r13]
-	add r13, [Layer_3_Length]
+	movzx r13, DWORD [Layer_4_Length]	; mov the Length of the TCP/UDP Header including Options into r13
+	lea r14, [r15 + r13]			; Load the Effective Address of r15 offset by the Layer 4 Header to be the Base Address of the Data
+	add r13, [Layer_3_Length]		; Add the IPv4/IPv6 byte amount including Options to r13
 	add r13, 14
-	movzx r12, DWORD [Packet_Length]
-	sub r12, r13
+	movzx r12, DWORD [Packet_Length]	; mov he byte amount of the Packet into r12
+	sub r12, r13				; Subtract the byte amount of the Packet by the Ethernet Header byte amount, the Layer 3 Header byte amount including Options, and the Layer 4byte amount including Options to get the Data byte amount
 	mov eax, 0x1
 	mov edi, 0x1
 	mov esi, r14d
@@ -1069,9 +1062,6 @@ ARP_Hdr_Msg_Len equ $-ARP_Header_Message
 
 Arp:
 	db 0
-
-Layer_3_Base_Pointer:
-	dq 0
 
 ; IPv6
 IPv6_Header_Message:
